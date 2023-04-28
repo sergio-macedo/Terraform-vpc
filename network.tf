@@ -8,6 +8,7 @@ resource "aws_vpc" "sergio-vpc" {
   }
 }
 
+#Creating a public subnet per AZ
 resource "aws_subnet" "public-subnets" {
   count                   = length(var.subnet_cidr_public)
   vpc_id                  = aws_vpc.sergio-vpc.id
@@ -18,8 +19,7 @@ resource "aws_subnet" "public-subnets" {
     "Name" = "Public subnet ${count.index + 1}"
   }
 }
-
-
+#Creating the private subnets per AZ that will receive the instances
 resource "aws_subnet" "private_subnets" {
   count                   = length(var.subnet_cidr_private)
   vpc_id                  = aws_vpc.sergio-vpc.id
@@ -30,7 +30,8 @@ resource "aws_subnet" "private_subnets" {
     "Name" = "Private subnet ${count.index + 1}"
   }
 }
-# Create Public Route Table
+
+# The public route table direct to the internet gateway
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.sergio-vpc.id
   route {
@@ -41,12 +42,15 @@ resource "aws_route_table" "public_rt" {
     Name = "public subnet route table"
   }
 }
+
 # Create route table association of public subnets
 resource "aws_route_table_association" "internet_for_pub_sub" {
-  count                   = length(var.subnet_cidr_public)
+  count          = length(var.subnet_cidr_public)
   route_table_id = aws_route_table.public_rt.id
   subnet_id      = aws_subnet.public-subnets[count.index].id
 }
+
+#the igw that will connect to the public route table
 resource "aws_internet_gateway" "sergio-igw" {
   vpc_id = aws_vpc.sergio-vpc.id
   tags = {
@@ -54,21 +58,22 @@ resource "aws_internet_gateway" "sergio-igw" {
   }
 }
 
+# necessary to create the NAT gateways
 resource "aws_eip" "nat-eips" {
   count = length(var.subnet_cidr_public)
   vpc   = true
 }
 
+# the NAT gateways , its necessary one per private subnet,
 resource "aws_nat_gateway" "sergio-nat-gateway" {
   count         = length(var.subnet_cidr_public)
   allocation_id = aws_eip.nat-eips[count.index].id
   subnet_id     = aws_subnet.public-subnets[count.index].id
 }
 
-
-
+#the route tables that takes the private subnets to the nat gateways
 resource "aws_route_table" "private_route_tables" {
-  count  = length(var.subnet_cidr_private)
+  count  = length(var.subnet_cidr_private)// put a count here.
   vpc_id = aws_vpc.sergio-vpc.id
   route {
     cidr_block     = "0.0.0.0/0"
@@ -79,6 +84,7 @@ resource "aws_route_table" "private_route_tables" {
   }
 }
 
+#the association between the rt and the priv-subnets
 resource "aws_route_table_association" "asso-private" {
   count          = length(var.subnet_cidr_private)
   subnet_id      = aws_subnet.private_subnets[count.index].id

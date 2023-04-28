@@ -1,3 +1,4 @@
+# target groups are those who take the instances to the load balancer
 resource "aws_lb_target_group" "sergio-tg" {
   name        = "sergio-tg"
   port        = 80
@@ -14,6 +15,7 @@ resource "aws_lb_target_group" "sergio-tg" {
   }
 }
 
+# tells where the tg should listen
 resource "aws_lb_listener" "sergio-listener" {
   load_balancer_arn = aws_lb.sergio-load-balancer.arn
   port              = "80"
@@ -26,6 +28,8 @@ resource "aws_lb_listener" "sergio-listener" {
   }
 }
 
+# the load balancer itself, even that its taking instances on the private subnet, it has to reach
+#the pb-subnets of the AZ
 resource "aws_lb" "sergio-load-balancer" {
   name               = "sergio-lb"
   internal           = false
@@ -39,27 +43,6 @@ resource "aws_lb" "sergio-load-balancer" {
     Environment = "sergio-lb"
   }
 }
-#resource "aws_security_group" "instance-sg" {
-#  name        = "instance-sg"
-#  description = "http access"
-#  vpc_id      = aws_vpc.sergio-vpc.id
-#
-#  ingress {
-#    from_port       = 80
-#    protocol        = "tcp"
-#    to_port         = 80
-#    cidr_blocks     = ["10.110.99.0/24"]
-#    security_groups = [aws_security_group.lb-sg.id]
-#  }
-#  egress {
-#    from_port   = 0
-#    protocol    = "-1"
-#    to_port     = 0
-#    cidr_blocks = ["0.0.0.0/0"]
-#  }
-#
-#
-#}
 
 resource "aws_security_group" "lb-sg" {
   name        = "lb-sg"
@@ -96,58 +79,6 @@ resource "aws_security_group_rule" "soutbound_all" {
 }
 
 
-#resource "aws_security_group" "sergio-sg" {
-#  name        = "allow_http_access"
-#  description = "allow inbound http traffic"
-#  vpc_id      = aws_vpc.sergio-vpc.id
-#
-#
-#  ingress {
-#
-#    description     = "from my ip range"
-#    from_port       = "80"
-#    to_port         = "80"
-#    protocol        = "tcp"
-#    cidr_blocks     = ["0.0.0.0/0"]
-#  }
-#  egress {
-#    from_port       = "0"
-#    protocol        = "-1"
-#    to_port         = "0"
-#    cidr_blocks     = ["0.0.0.0/0"]
-#  }
-#  tags = {
-#    "Name" = "sergio-sg"
-#  }
-#}
-#
-#resource "aws_security_group" "lb-sg" {
-#  name   = "sergio-lb-sg"
-#  vpc_id = aws_vpc.sergio-vpc.id
-#  ingress {
-#    protocol  = -1
-#    from_port = 0
-#    to_port   = 0
-#    security_groups = [aws_security_group.sergio-sg.id]
-#
-#  }
-#
-#  egress {
-#    from_port   = 0
-#    to_port     = 0
-#    protocol    = "-1"
-#    cidr_blocks = ["0.0.0.0/0"]
-#    security_groups = [aws_security_group.sergio-sg.id]
-#
-#  }
-#}
-#resource "aws_security_group_rule" "" {
-#  from_port         = 0
-#  protocol          =
-#  security_group_id = aws_security_group.lb-sg.id
-#  to_port           = 0
-#  type              = ""
-#}
 /* #Auto Scaling */
 resource "aws_autoscaling_group" "sergio-asg" {
   name                      = "sergio-asg"
@@ -159,6 +90,7 @@ resource "aws_autoscaling_group" "sergio-asg" {
   force_delete              = true
   vpc_zone_identifier       = [for subnet in aws_subnet.private_subnets : subnet.id]
   target_group_arns         = [aws_lb_target_group.sergio-tg.arn]
+
   launch_template {
     id      = aws_launch_template.ec2-sergio-template.id
     version = "$Latest"
@@ -166,11 +98,11 @@ resource "aws_autoscaling_group" "sergio-asg" {
 
   tag {
     key                 = "Name"
-    value               = "asg"
+    value               = "asg-instances"
     propagate_at_launch = true
   }
 }
-
+#using launch template, aws console said that the l-configurations is deprecated.
 resource "aws_launch_template" "ec2-sergio-template" {
   name                   = "ec2-sergio-template"
   image_id               = data.aws_ami.amazon_ami.id
@@ -234,3 +166,61 @@ resource "aws_security_group_rule" "outbound_all" {
 #  strategy = "cluster"
 #}
 
+
+
+
+
+
+
+#resource "aws_security_group" "sergio-sg" {
+#  name        = "allow_http_access"
+#  description = "allow inbound http traffic"
+#  vpc_id      = aws_vpc.sergio-vpc.id
+#
+#
+#  ingress {
+#
+#    description     = "from my ip range"
+#    from_port       = "80"
+#    to_port         = "80"
+#    protocol        = "tcp"
+#    cidr_blocks     = ["0.0.0.0/0"]
+#  }
+#  egress {
+#    from_port       = "0"
+#    protocol        = "-1"
+#    to_port         = "0"
+#    cidr_blocks     = ["0.0.0.0/0"]
+#  }
+#  tags = {
+#    "Name" = "sergio-sg"
+#  }
+#}
+#
+#resource "aws_security_group" "lb-sg" {
+#  name   = "sergio-lb-sg"
+#  vpc_id = aws_vpc.sergio-vpc.id
+#  ingress {
+#    protocol  = -1
+#    from_port = 0
+#    to_port   = 0
+#    security_groups = [aws_security_group.sergio-sg.id]
+#
+#  }
+#
+#  egress {
+#    from_port   = 0
+#    to_port     = 0
+#    protocol    = "-1"
+#    cidr_blocks = ["0.0.0.0/0"]
+#    security_groups = [aws_security_group.sergio-sg.id]
+#
+#  }
+#}
+#resource "aws_security_group_rule" "" {
+#  from_port         = 0
+#  protocol          =
+#  security_group_id = aws_security_group.lb-sg.id
+#  to_port           = 0
+#  type              = ""
+#}
